@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
@@ -15,8 +16,41 @@ import { Search, Settings, Users, ArrowRight } from 'lucide-react-native';
 export default function RoleSelection() {
   const [selectedRole, setSelectedRole] = useState<'client' | 'professional' | null>(null);
   const [loading, setLoading] = useState(false);
+  const [checkingRole, setCheckingRole] = useState(true);
   const { user } = useAuth();
   const router = useRouter();
+
+  // Check if user already has a role
+  useEffect(() => {
+    const checkUserRole = async () => {
+      if (!user) return;
+      try {
+        const { data, error } = await supabase
+          .from('users')
+          .select('role')
+          .eq('user_id', user.id)
+          .single();
+
+        if (error) throw error;
+
+        if (data?.role) {
+          // If role exists, redirect immediately
+          if (data.role === 'client') {
+            router.replace('/(client)');
+          } else if (data.role === 'professional') {
+            router.replace('/(professional)');
+          }
+        }
+      } catch (err: any) {
+        console.error('Error checking user role:', err.message);
+        Alert.alert('Error', 'Unable to verify role. Please try again.');
+      } finally {
+        setCheckingRole(false);
+      }
+    };
+
+    checkUserRole();
+  }, [user]);
 
   const handleRoleSelection = async () => {
     if (!selectedRole || !user) {
@@ -46,6 +80,15 @@ export default function RoleSelection() {
     }
   };
 
+  if (checkingRole) {
+    // Show a loading indicator while verifying role
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#2563EB" />
+      </View>
+    );
+  }
+
   return (
     <LinearGradient
       colors={['#2563EB', '#1D4ED8', '#1E40AF']}
@@ -67,7 +110,11 @@ export default function RoleSelection() {
             onPress={() => setSelectedRole('client')}
           >
             <View style={styles.optionContent}>
-              <Search size={32} color={selectedRole === 'client' ? '#2563EB' : 'white'} strokeWidth={1.5} />
+              <Search
+                size={32}
+                color={selectedRole === 'client' ? '#2563EB' : 'white'}
+                strokeWidth={1.5}
+              />
               <View style={styles.optionText}>
                 <Text style={[
                   styles.optionTitle,
@@ -93,7 +140,11 @@ export default function RoleSelection() {
             onPress={() => setSelectedRole('professional')}
           >
             <View style={styles.optionContent}>
-              <Users size={32} color={selectedRole === 'professional' ? '#2563EB' : 'white'} strokeWidth={1.5} />
+              <Users
+                size={32}
+                color={selectedRole === 'professional' ? '#2563EB' : 'white'}
+                strokeWidth={1.5}
+              />
               <View style={styles.optionText}>
                 <Text style={[
                   styles.optionTitle,
@@ -219,5 +270,10 @@ const styles = StyleSheet.create({
   },
   buttonIcon: {
     marginLeft: 8,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
